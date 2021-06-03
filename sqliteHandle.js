@@ -13,6 +13,10 @@ class sqliteHandle {
     fieldStr = '*';
     whereData = [];
     whereStr = '';
+    countStr = '';
+    countAsStr = '';
+    sumStr = '';
+    sumAsStr = '';
     andStr = 'and';
     orStr = 'or';
     orderData = [];
@@ -23,12 +27,13 @@ class sqliteHandle {
     joinStr = '';
     updateData = [];
     updateStr = '';
-    DB = {};
-    sql = '';
-    queryData = null | [] | '';
+    transactionStr = 'BEGIN;';//开启事务
+    rollbackStr = 'ROLLBACK;';//事务回滚
+    commitStr = 'COMMIT;';//事务提交
 
     //初始化
     constructor(file = 'test.db') {
+        this.distructorData = JSON.parse(JSON.stringify(this));//存储析构参数
         this.createDatabase(file); //默认创建数据库
     }
 
@@ -83,6 +88,20 @@ class sqliteHandle {
         if (field != '' && field.constructor == String) this.fieldStr = field;
         if (field.constructor == Array) this.field(field);
         return this.createTable('select');
+    }
+
+    //统计
+    count(as = '') {
+        this.countStr = 'count(*)';
+        if(as != '' && as.constructor == String) this.countAsStr = `as ${as}`;
+        return this.createTable('count');
+    }
+
+    //总计
+    sum(field = '',as = '') {
+        this.sumStr = `sum(${field})`;
+        if(as != '' && as.constructor == String) this.sumAsStr = `as ${as}`;
+        return this.createTable('sum');
     }
 
     //联合查询
@@ -168,6 +187,21 @@ class sqliteHandle {
         return this;
     }
 
+    //开始事务
+    transaction() {
+        return this.promise(this.transactionStr);
+    }
+
+    //回滚事务
+    rollback() {
+        return this.promise(this.rollbackStr);
+    }
+
+    //提交事务
+    commit() {
+        return this.promise(this.commitStr);
+    }
+
     //类型转换
     setValueType(value, index = 0) {
         let init = value;
@@ -210,13 +244,29 @@ class sqliteHandle {
         }
     }
 
+    //同步
+    promise(sql) {
+        return new Promise((resolve, reject) => {
+            this.run(sql, (object) => {
+                resolve(object)
+            });
+        });
+    }
+
+    //析构函数
+    destructor() {
+        for (let property in this.distructorData) {
+            this[property] = this.distructorData[property]
+        }
+    }
+
     //创建sql语句
     createTable(sign = '') {
         let table = '';
         switch (sign) {
             case 'save':
-                table = `insert into ${this.tableName} ${this.saveFieldStr} ${this.saveValueStr}`;
-                this.queryData = this.run(table); //执行
+                table = `insert into ${this.tableName} ${this.saveFieldStr} ${this.saveValueStr};`;
+                this.queryData = this.promise(table);
                 this.sql = table;//保存最后的语句
                 break;
             case 'select':
@@ -225,7 +275,31 @@ class sqliteHandle {
                 if (this.whereStr.trim() != '') table += ` where ${this.whereStr}`;
                 if (this.groupStr.trim() != '') table += ` group by ${this.groupStr}`;
                 if (this.orderStr.trim() != '') table += ` order by ${this.orderStr}`;
-                if (this.limitStr.trim() != '') table += ` limit ${this.limitStr}`;
+                if (this.limitStr.trim() != '') table += ` limit ${this.limitStr};`;
+                //执行查询语句
+                this.queryData = new Promise((resolve, reject) => {
+                    this.query(table, (object) => {
+                        resolve(object)
+                    });
+                });
+                this.sql = table;//保存最后的语句
+                break;
+            case 'count':
+                table = `select ${this.countStr} ${this.countAsStr} from ${this.tableName}`;
+                if (this.joinStr.trim() != '') table += ` ${this.joinStr}`;
+                if (this.whereStr.trim() != '') table += ` where ${this.whereStr}`;
+                //执行查询语句
+                this.queryData = new Promise((resolve, reject) => {
+                    this.query(table, (object) => {
+                        resolve(object)
+                    });
+                });
+                this.sql = table;//保存最后的语句
+                break;
+            case 'sum':
+                table = `select ${this.sumStr} ${this.sumAsStr} from ${this.tableName}`;
+                if (this.joinStr.trim() != '') table += ` ${this.joinStr}`;
+                if (this.whereStr.trim() != '') table += ` where ${this.whereStr}`;
                 //执行查询语句
                 this.queryData = new Promise((resolve, reject) => {
                     this.query(table, (object) => {
@@ -237,29 +311,31 @@ class sqliteHandle {
             case 'update':
                 table = `update ${this.tableName}`;
                 if (this.updateStr.trim() != '') table += ` set ${this.updateStr}`;
-                if (this.whereStr.trim() != '') table += ` where ${this.whereStr}`;
-                this.queryData = this.run(table); //执行
+                if (this.whereStr.trim() != '') table += ` where ${this.whereStr};`;
+                this.queryData = this.promise(table);
                 this.sql = table;//保存最后的语句
                 break;
             case 'delete':
                 table = `delete from ${this.tableName}`;
-                if (this.whereStr.trim() != '') table += ` where ${this.whereStr}`;
-                this.queryData = this.run(table); //执行
+                if (this.whereStr.trim() != '') table += ` where ${this.whereStr};`;
+                this.queryData = this.promise(table);
                 this.sql = table;//保存最后的语句
                 break;
             case 'queay':
-                this.queryData = this.run(this.sql); //执行
+                this.queryData = this.promise(table);
                 break;
             default:
                 break;
         }
-        // console.log(this.sql)
+        console.log(this.sql)
+        this.destructor();//析构函数
         return this.queryData;//返回的数据
 
     }
 
     //创建数据库
     createDatabase(file) {
+        this.DB = {};
         this.DB.db = new sqlite3.Database(file);
         this.DB.exist = fs.existsSync(file);
         if (!this.DB.exist) {
@@ -268,19 +344,15 @@ class sqliteHandle {
     }
 
     //执行sql语句
-    run(sql) {
-        // this.DB.db.run(sql, function (err) {
-        //     if (null != err) {
-        //         return;
-        //     }
-        // });
-
+    run(sql, callback) {
         this.DB.db.serialize(()=>{
             this.DB.db.run(sql, function(err){
-                console.log(sql)
-                if(null != err){
+                if (null != err) {
                     return;
                 }
+                if (callback) {
+                    callback(err);
+                } 
             });
         });
     }

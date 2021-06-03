@@ -1,7 +1,10 @@
 const sqliteHandle = require('./sqliteHandle');
 
+//实例化
+var sqlite = new sqliteHandle('test.db');
+
 //建表
-(new sqliteHandle('test.db')).create('create table if not exists `tp_practices_consumption_order_goods` (\n' +
+sqlite.create('create table if not exists `tp_practices_consumption_order_goods` (\n' +
     '  `id` INTEGER PRIMARY KEY AUTOINCREMENT,\n' +
     '  `order_no` TEXT,\n' +
     '  `money` REAL,\n' +
@@ -31,7 +34,7 @@ const sqliteHandle = require('./sqliteHandle');
     ');');
 
 //建表
-(new sqliteHandle('test.db')).create('create table if not exists `tp_practices_consumption_order` (\n' +
+sqlite.create('create table if not exists `tp_practices_consumption_order` (\n' +
     '    id INTEGER PRIMARY KEY AUTOINCREMENT,\n' +
     '    order_time INTEGER,\n' +
     '    order_no TEXT,\n' +
@@ -97,37 +100,55 @@ const sqliteHandle = require('./sqliteHandle');
     '  "order_time" COLLATE BINARY ASC\n' +
     ');');
 
-
+//开启事务
+sqlite.transaction();
 //保存
-(new sqliteHandle('test.db')).table('tp_practices_consumption_order').save({
-    'order_time': 1231
+sqlite.table('tp_practices_consumption_order').save({
+    'order_time': 2222
+});
+//事务回滚
+// sqlite.rollback().then((data)=>{
+//     //获取数据
+//     console.log(data)
+// });
+//提交事务
+sqlite.commit().then((data)=>{
+    //获取数据
+    console.log(data)
 });
 
-//删除
-(new sqliteHandle('test.db')).table('tp_practices_consumption_order').where([
+
+// 删除
+sqlite.table('tp_practices_consumption_order').where([
     ['id',7],
-]).delete();
+]).delete().then((data)=>{
+    //获取数据
+    console.log(data)
+});
 
 
 // //更新
-(new sqliteHandle('test.db')).table('tp_practices_consumption_order').where([
+sqlite.table('tp_practices_consumption_order').where([
     ['id',3]
 ]).update({
     'member_no' : 22222,
     'order_no' : 'aaaaa'
+}).then((data)=>{
+    //获取数据
+    console.log(data)
 });
 
 
-// //查询
-(new sqliteHandle('test.db')).table('tp_practices_consumption_order')
+//查询
+sqlite.table('tp_practices_consumption_order')
     .leftjoin('tp_practices_consumption_order_goods', 'tp_practices_consumption_order_goods.order_no = tp_practices_consumption_order.order_no')
     .field([
         'tp_practices_consumption_order.order_no',
-        'tp_practices_consumption_order.member_no'
+        'tp_practices_consumption_order.member_no',
     ])
     .where([
         ['tp_practices_consumption_order.member_no|tp_practices_consumption_order.order_no', 'is', null],
-        ['tp_practices_consumption_order.member_no', '=', '1111'],
+        // ['tp_practices_consumption_order.member_no', '=', '1111'],
     ])
     .group(['tp_practices_consumption_order.order_no'])
     .order({
@@ -137,4 +158,46 @@ const sqliteHandle = require('./sqliteHandle');
     .select().then((data) => {
         //获取数据
         console.log(data)
-    });``
+    });
+
+
+
+
+//统计 方式一：
+sqlite.table('tp_practices_consumption_order').count('count').then((data)=>{
+    //获取数据
+    console.log(data)
+});
+//统计 方式二:
+sqlite.table('tp_practices_consumption_order').select('count(*) as count').then((data)=>{
+    //获取数据
+    console.log(data)
+});
+//统计 方式三:
+sqlite.table('tp_practices_consumption_order').field([
+    'count(*) as count'
+]).select().then((data)=>{
+    //获取数据
+    console.log(data)
+});
+
+
+
+
+//总计 方式一:
+sqlite.table('tp_practices_consumption_order').sum('order_no','order_no').then((data)=>{
+    //获取数据
+    console.log(data)
+});
+//总计 方式二:
+sqlite.table('tp_practices_consumption_order').select('sum(order_no) as order_no').then((data)=>{
+    //获取数据
+    console.log(data)
+});
+//总计 方式三:
+sqlite.table('tp_practices_consumption_order').field([
+    'sum(order_no) as order_no'
+]).select().then((data)=>{
+    //获取数据
+    console.log(data)
+});
