@@ -150,6 +150,7 @@ sqlite.table('tp_practices_consumption_order')
         ['tp_practices_consumption_order.member_no|tp_practices_consumption_order.order_no', 'is', null],
         // ['tp_practices_consumption_order.member_no', '=', '1111'],
     ])
+    .whereRow("tp_practices_consumption_order.member_no is null")//where的原型操作
     .group(['tp_practices_consumption_order.order_no'])
     .order({
         order_time: 'DESC',

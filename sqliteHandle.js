@@ -13,6 +13,7 @@ class sqliteHandle {
     fieldStr = '*';
     whereData = [];
     whereStr = '';
+    whereRowStr = '';
     countStr = '';
     countAsStr = '';
     sumStr = '';
@@ -148,6 +149,12 @@ class sqliteHandle {
         return this;
     }
 
+    //where原生条件
+    whereRow(str = '') {
+        this.whereRowStr = str;
+        return this;
+    }
+
     //group by 分组
     group(group = []) {
         this.groupData = group;
@@ -233,6 +240,11 @@ class sqliteHandle {
         return str.replace(eval(`/${char}$/`), '');
     }
 
+    //正则
+    strMatch(str,match) {
+        return str.search(eval(`/${match}/`),i);
+    }
+
     //字符串转数组
     strToArray(str, s = ',') {
         if (typeof (str) == 'string') {
@@ -272,7 +284,11 @@ class sqliteHandle {
             case 'select':
                 table = `select ${this.fieldStr} from ${this.tableName}`;
                 if (this.joinStr.trim() != '') table += ` ${this.joinStr}`;
-                if (this.whereStr.trim() != '') table += ` where ${this.whereStr}`;
+                if (this.whereStr.trim() != '') {
+                    table += ` where ${this.whereStr} and ${this.whereRowStr}`;
+                } else {
+                    table += ` where ${this.whereRowStr}`;
+                }
                 if (this.groupStr.trim() != '') table += ` group by ${this.groupStr}`;
                 if (this.orderStr.trim() != '') table += ` order by ${this.orderStr}`;
                 if (this.limitStr.trim() != '') table += ` limit ${this.limitStr};`;
